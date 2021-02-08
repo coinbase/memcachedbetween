@@ -1,0 +1,15 @@
+version: "3.7"
+
+services:
+  memcached1:
+    image: "memcached:1.6"
+    ports:
+      - "11213:11211"
+  memcached2:
+    image: "memcached:1.6"
+    ports:
+      - "11214:11211"
+  memcached3:
+    image: "memcached:1.6"
+    ports:
+      - "11215:11211"
