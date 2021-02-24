@@ -49,7 +49,7 @@ func newConnectionConfig(opts ...ConnectionOption) (*connectionConfig, error) {
 // ConnectionOption is used to configure a connection.
 type ConnectionOption func(*connectionConfig) error
 
-func withErrorHandlingCallback(fn func(error)) ConnectionOption {
+func WithErrorHandlingCallback(fn func(error)) ConnectionOption {
 	return func(c *connectionConfig) error {
 		c.errorHandlingCallback = fn
 		return nil

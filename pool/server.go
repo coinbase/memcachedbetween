@@ -78,8 +78,7 @@ func NewServer(addr Address, opts ...ServerOption) (*Server, error) {
 		PoolMonitor: cfg.poolMonitor,
 	}
 
-	connectionOpts := append(cfg.connectionOpts, withErrorHandlingCallback(s.ProcessHandshakeError))
-	s.pool, err = newPool(pc, connectionOpts...)
+	s.pool, err = newPool(pc, cfg.connectionOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -139,30 +138,4 @@ func (s *Server) Connection(ctx context.Context) (*Connection, error) {
 	}
 
 	return &Connection{connection: conn}, nil
-}
-
-// ProcessHandshakeError implements SDAM error handling for errors that occur before a connection finishes handshaking.
-func (s *Server) ProcessHandshakeError(err error) {
-	if err == nil {
-		return
-	}
-	wrappedConnErr := unwrapConnectionError(err)
-	if wrappedConnErr == nil {
-		return
-	}
-
-	s.pool.clear()
-}
-
-// unwrapConnectionError returns the connection error wrapped by err, or nil if err does not wrap a connection error.
-func unwrapConnectionError(err error) error {
-	// This is essentially an implementation of errors.As to unwrap this error until we get a ConnectionError and then
-	// return ConnectionError.Wrapped.
-
-	connErr, ok := err.(ConnectionError)
-	if ok {
-		return connErr.Wrapped
-	}
-
-	return nil
 }
