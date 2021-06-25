@@ -39,7 +39,7 @@ func ConfigConnection(log *zap.Logger, conn net.Conn, kill chan interface{}, con
 					panic(err)
 				}
 			} else if string(command) == "config get cluster" {
-				out := fmt.Sprintf("CONFIG cluster 0 %d\n1\n%s\n\nEND\n", len(configsJoined), configsJoined)
+				out := fmt.Sprintf("CONFIG cluster 0 %d\n1\n%s\n\nEND\r\n", len(configsJoined), configsJoined)
 				_, err = conn.Write([]byte(out))
 				if err != nil {
 					panic(err)
