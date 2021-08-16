@@ -3,14 +3,17 @@ package elasticache
 import (
 	"bufio"
 	"fmt"
-	"go.uber.org/zap"
 	"io"
 	"net"
 	"strconv"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
-func ClusterNodes(_ *zap.Logger, endpoint string) ([]string, error) {
+// ClusterNodes Reads from the elasticache config node (endpoint) and
+//              returns a slice of memcache node addresses
+func ClusterNodes(l *zap.Logger, endpoint string) ([]string, error) {
 	if !strings.Contains(endpoint, ":") {
 		endpoint = endpoint + ":11211"
 	}
@@ -19,7 +22,10 @@ func ClusterNodes(_ *zap.Logger, endpoint string) ([]string, error) {
 		return nil, err
 	}
 	defer func() {
-		_ = conn.Close()
+		err2 := conn.Close()
+		if err2 != nil && l != nil {
+			l.Warn("elasticache failed to close: ", zap.Error(err2))
+		}
 	}()
 
 	command := "config get cluster\r\n"
