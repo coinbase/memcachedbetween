@@ -34,6 +34,13 @@ const (
 	initialized
 )
 
+// ServerWrapper implementations wrap a connection to a server in the pool
+type ServerWrapper interface {
+	Connect() error
+	Disconnect(ctx context.Context) error
+	Connection(ctx context.Context) (ConnectionWrapper, error)
+}
+
 // Server is a single server within a topology.
 type Server struct {
 	cfg             *serverConfig
@@ -119,7 +126,7 @@ func (s *Server) Disconnect(ctx context.Context) error {
 }
 
 // Connection gets a connection to the server.
-func (s *Server) Connection(ctx context.Context) (*Connection, error) {
+func (s *Server) Connection(ctx context.Context) (ConnectionWrapper, error) {
 	if s.pool.monitor != nil {
 		s.pool.monitor.Event(&Event{
 			Type:    "ConnectionCheckOutStarted",

@@ -143,6 +143,17 @@ func (c *connection) closed() bool {
 	return atomic.LoadInt32(&c.connected) == disconnected
 }
 
+// ConnectionWrapper implementations wrap a net.Conn object
+type ConnectionWrapper interface {
+	Conn() net.Conn
+	Close() error
+	Return() error
+	Alive() bool
+	ID() uint64
+	Address() Address
+	LocalAddress() Address
+}
+
 // Connection implements the driver.Connection interface to allow reading and writing wire
 // messages and the driver.Expirable interface to allow expiring.
 type Connection struct {
