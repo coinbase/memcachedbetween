@@ -92,7 +92,7 @@ func (c *connection) handleMessage() (log *zap.Logger, err error) {
 func (c *connection) roundTrip(wm []byte) (res []byte, log *zap.Logger, err error) {
 	log = c.log
 
-	var conn *pool.Connection
+	var conn pool.ConnectionWrapper
 	if conn, err = c.checkoutConnection(); err != nil {
 		return
 	}
@@ -111,7 +111,7 @@ func (c *connection) roundTrip(wm []byte) (res []byte, log *zap.Logger, err erro
 	return
 }
 
-func (c *connection) checkoutConnection() (conn *pool.Connection, err error) {
+func (c *connection) checkoutConnection() (conn pool.ConnectionWrapper, err error) {
 	defer func(start time.Time) {
 		addr := ""
 		if conn != nil {
