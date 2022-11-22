@@ -9,7 +9,7 @@ GEM
       zeitwerk (~> 2.2, >= 2.2.2)
     concurrent-ruby (1.1.7)
     connection_pool (2.2.3)
-    dalli (2.7.11)
+    dalli (3.2.3)
     dalli-elasticache (0.2.0)
       dalli (>= 1.0.0)
     eventmachine (1.2.7)
