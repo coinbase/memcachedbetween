@@ -96,6 +96,7 @@ func (rp *resourcePool) initialize() {
 }
 
 // add will add a new rpe to the pool, requires that the resource pool is locked
+// The element will be added to the end and will be retrieved from the front
 func (rp *resourcePool) add(e *resourcePoolElement) {
 	if e == nil {
 		e = &resourcePoolElement{
@@ -103,13 +104,16 @@ func (rp *resourcePool) add(e *resourcePoolElement) {
 		}
 	}
 
-	e.next = rp.start
-	if rp.start != nil {
-		rp.start.prev = e
-	}
-	rp.start = e
 	if rp.end == nil {
 		rp.end = e
+	} else {
+		rp.end.next = e
+		e.prev = rp.end
+		rp.end = e
+	}
+
+	if rp.start == nil {
+		rp.start = e
 	}
 	atomic.AddUint64(&rp.size, 1)
 }
