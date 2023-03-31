@@ -8,7 +8,6 @@ package pool
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -148,7 +147,6 @@ func newPool(config poolConfig, connOpts ...ConnectionOption) (*pool, error) {
 	if maintainInterval == 0 {
 		maintainInterval = defaultMaintainInterval
 	}
-	fmt.Println("maintainInterval:", maintainInterval)
 
 	// we do not pass in config.MaxPoolSize because we manage the max size at this level rather than the resource pool level
 	rpc := resourcePoolConfig{

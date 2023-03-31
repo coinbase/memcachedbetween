@@ -83,14 +83,14 @@ func TestGoodConnectionDespiteInactivity(t *testing.T) {
 	ctx := context.TODO()
 	defer ctx.Done()
 	conn, err := p.get(ctx)
+	p.put(conn)
 	assert.NoError(t, err)
+	assert.False(t, connectionExpiredFunc(conn))
 	if err == nil {
 		time.Sleep(duration)
-		assert.True(t, connectionExpiredFunc(conn))
-		assert.Equal(t, ReasonOld, conn.expireReason)
 		conn, err = p.get(ctx)
 		assert.NoError(t, err)
 		assert.Equal(t, "", conn.expireReason)
-		assert.Equal(t, 1, conn.connected)
+		assert.Equal(t, connected, conn.connected)
 	}
 }
