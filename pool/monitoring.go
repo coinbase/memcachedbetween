@@ -52,7 +52,7 @@ const (
 	ReasonStale             = "stale"
 	ReasonConnectionErrored = "connectionError"
 	ReasonTimedOut          = "timeout"
-	ReasonOld               = "old"
+	ReasonConnectionExpired               = "old"
 )
 
 // strings for pool command monitoring types

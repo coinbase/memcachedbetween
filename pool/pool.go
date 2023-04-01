@@ -43,7 +43,7 @@ type poolConfig struct {
 	MinPoolSize          uint64
 	MaxPoolSize          uint64 // MaxPoolSize is not used because handling the max number of connections in the pool is handled in server. This is only used for command monitoring
 	PoolMonitor          *Monitor
-	ConnectionInactivity time.Duration // if set, determines how long to keep a connection if left unused
+	ConnectionLifeSpan time.Duration // if set, determines how long to keep a connection if left unused
 	MaintainInterval     time.Duration // for ResourcePool periodic element checks
 }
 
@@ -59,7 +59,7 @@ type pool struct {
 	nextid     uint64
 	opened     map[uint64]*connection // opened holds all of the currently open connections.
 	sem        *semaphore.Weighted
-	inactivity uint64 // max allowed inactivity timer for connections
+	connectionLifeSpan time.Duration // max allowed connection idleness
 	sync.Mutex
 }
 
@@ -82,8 +82,8 @@ func connectionExpiredFunc(v interface{}) bool {
 		c.expireReason = ReasonConnectionErrored
 	case c.pool.stale(c):
 		c.expireReason = ReasonStale
-	case c.pool.old(c):
-		c.expireReason = ReasonOld
+	case c.pool.connectionExpired(c):
+		c.expireReason = ReasonConnectionExpired
 	default:
 		return false
 	}
@@ -141,8 +141,12 @@ func newPool(config poolConfig, connOpts ...ConnectionOption) (*pool, error) {
 		opened:     make(map[uint64]*connection),
 		opts:       opts,
 		sem:        semaphore.NewWeighted(int64(maxConns)),
-		inactivity: uint64(config.ConnectionInactivity),
 	}
+	if config.ConnectionLifeSpan == 0 {
+    pool.connectionLifeSpan = math.MaxInt64 * time.Nanosecond
+  } else {
+    pool.connectionLifeSpan = config.ConnectionLifeSpan
+  }
 	maintainInterval := config.MaintainInterval
 	if maintainInterval == 0 {
 		maintainInterval = defaultMaintainInterval
@@ -183,16 +187,9 @@ func (p *pool) stale(c *connection) bool {
 	return c == nil || c.generation < atomic.LoadUint64(&p.generation)
 }
 
-// old checks if a given connection's last used time is still within margin
-func (p *pool) old(c *connection) bool {
-	if c == nil {
-		return true
-	}
-	inactivity := atomic.LoadUint64(&p.inactivity)
-	if inactivity == 0 {
-		return false
-	}
-	return uint64(time.Now().Sub(c.lastUsedTime)) > inactivity
+// checks if a given connection's expiresAfter has exceeded
+func (p *pool) connectionExpired(c *connection) bool {
+	return c == nil || time.Now().After(c.expiresAfter)
 }
 
 // connect puts the pool into the connected state, allowing it to be used and will allow items to begin being processed from the wait queue
@@ -281,6 +278,7 @@ func (p *pool) makeNewConnection() (*connection, string, error) {
 	c.pool = p
 	c.poolID = atomic.AddUint64(&p.nextid, 1)
 	c.generation = atomic.LoadUint64(&p.generation)
+  c.expiresAfter = time.Now().Add(p.connectionLifeSpan)
 
 	if p.monitor != nil {
 		p.monitor.Event(&Event{
@@ -535,7 +533,7 @@ func (p *pool) put(c *connection) error {
 		return ErrWrongPool
 	}
 
-	c.lastUsedTime = time.Now() // we really don't know if the connection was used; but this is a good guess
+	c.expiresAfter = time.Now().Add(p.connectionLifeSpan) // we really don't know if the connection was used; but this is a good guess
 	_ = p.conns.Put(c)
 
 	return nil

@@ -27,8 +27,40 @@ func startTcpServer(addr string) {
 	}
 }
 
-// Tests the connectionExpiredFunc and the whole inactivity aging
-func TestInactivity(t *testing.T) {
+func TestPoolExpiredFn(t *testing.T) {
+	p := &pool{
+    address:    "localhost:8000",
+		monitor:    nil,
+		connected:  disconnected,
+    opened:     nil,
+		opts:       nil,
+		sem:        nil,
+	}
+  conn, err := newConnection("localhost:0000")
+  assert.NoError(t, err)
+  conn.pool = p
+  assert.Empty(t, conn.expireReason)
+  // first the disconnected case
+  conn.connected = disconnected
+  assert.True(t, connectionExpiredFunc(conn))
+  assert.Equal(t, ReasonPoolClosed, conn.expireReason)
+
+  // the connection staleness
+  p.generation++
+  p.connected = connected
+  conn.connected = connected
+  assert.True(t, connectionExpiredFunc(conn))
+  assert.Equal(t, ReasonStale, conn.expireReason)
+
+  // the connection staleness
+  conn.generation = p.generation
+  conn.expiresAfter = time.Now()
+  time.Sleep(100 * time.Millisecond)
+  assert.True(t, connectionExpiredFunc(conn))
+  assert.Equal(t, ReasonConnectionExpired, conn.expireReason)
+}
+// Tests the connectionExpiredFunc and the whole connection expiry
+func TestConnectionExpiry(t *testing.T) {
 	duration := 5 * time.Second
 
 	var address Address = "localhost:38888"
@@ -38,7 +70,7 @@ func TestInactivity(t *testing.T) {
 		MinPoolSize:          1,
 		MaxPoolSize:          1,
 		PoolMonitor:          nil,
-		ConnectionInactivity: duration,
+		ConnectionLifeSpan: duration,
 		MaintainInterval:     1 * time.Second,
 	}
 
@@ -55,7 +87,7 @@ func TestInactivity(t *testing.T) {
 	if err == nil {
 		time.Sleep(duration)
 		assert.True(t, connectionExpiredFunc(conn))
-		assert.Equal(t, ReasonOld, conn.expireReason)
+		assert.Equal(t, ReasonConnectionExpired, conn.expireReason)
 	}
 }
 
@@ -70,7 +102,7 @@ func TestGoodConnectionDespiteInactivity(t *testing.T) {
 		MinPoolSize:          1,
 		MaxPoolSize:          1,
 		PoolMonitor:          nil,
-		ConnectionInactivity: duration,
+		ConnectionLifeSpan: duration,
 		MaintainInterval:     1 * time.Second,
 	}
 

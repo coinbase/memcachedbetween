@@ -7,27 +7,40 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var counter = 0
-var config = resourcePoolConfig{
-	MaxSize:          5,
-	MinSize:          0,
-	MaintainInterval: 300 * time.Second,
-	ExpiredFn:        rpExpiredFunc,
-	CloseFn:          rpCloseFunc,
-	InitFn:           rpInitFunc,
-}
-
-func newRp() (*resourcePool, error) {
-	rp, e := newResourcePool(config)
+func newRp(expiredElements ...int) (*resourcePool, error) {
+  expired := FakeExpiredElements {
+    Expired: make(map[int]bool),
+  }
+  for i := range expiredElements {
+    expired.Expired[i] = true
+  }
+  var config = resourcePoolConfig{
+    MaxSize:          5,
+    MinSize:          0,
+    MaintainInterval: 300 * time.Second,
+    ExpiredFn:        expired.rpExpiredFunc,
+    CloseFn:          rpCloseFunc,
+    InitFn:           rpInitFunc,
+  }
+  rp, e := newResourcePool(config)
 	return rp, e
 }
 
+var counter = 0
 func rpInitFunc() interface{} {
 	counter++
 	return counter
 }
-func rpExpiredFunc(interface{}) bool {
-	return false
+type FakeExpiredElements struct {
+  Expired     map[int]bool
+}
+
+func (fe *FakeExpiredElements) rpExpiredFunc(item interface{}) bool {
+  i := item.(int)
+  if fe.Expired[i] {
+    return true
+  }
+  return false
 }
 func rpCloseFunc(interface{}) {
 
@@ -37,6 +50,10 @@ func TestList(t *testing.T) {
 	rp, e := newRp()
 	assert.NoError(t, e)
 	assert.Equal(t, uint64(0), rp.totalSize)
+	assert.Nil(t, rp.start)
+	assert.Nil(t, rp.end)
+
+  // Put uses add which increments size
 	newItem := 1
 	assert.True(t, rp.Put(newItem))
 	assert.Equal(t, uint64(1), rp.size)
@@ -47,6 +64,7 @@ func TestList(t *testing.T) {
 	assert.Nil(t, rp.end.next)
 	assert.Nil(t, rp.end.prev)
 
+  // this should reduce the size to 0
 	entry := rp.Get()
 	assert.NotNil(t, entry)
 	assert.Equal(t, uint64(0), rp.size)
@@ -54,6 +72,7 @@ func TestList(t *testing.T) {
 	assert.Nil(t, rp.start)
 	assert.Nil(t, rp.end)
 
+  // it's able to recover from going all the way to zero
 	assert.True(t, rp.Put(newItem))
 	assert.Equal(t, uint64(1), rp.size)
 	assert.Equal(t, newItem, entry)
@@ -63,6 +82,7 @@ func TestList(t *testing.T) {
 	assert.Nil(t, rp.start.next)
 }
 
+// ensures that when add() is used, the item is added to the end of the list
 func TestAddedToEnd(t *testing.T) {
 	rp, e := newRp()
 	assert.NoError(t, e)
@@ -75,6 +95,7 @@ func TestAddedToEnd(t *testing.T) {
 	assert.Equal(t, 2, rp.end.value.(int))
 }
 
+// ensures that when get() is used, the item is taken from the beginning of the list
 func TestTakenFromStart(t *testing.T) {
 	rp, e := newRp()
 	assert.NoError(t, e)

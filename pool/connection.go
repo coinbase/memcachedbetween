@@ -29,7 +29,7 @@ type connection struct {
 	cancelConnectContext context.CancelFunc
 	connectContextMade   chan struct{}
 	connectContextMutex  sync.Mutex
-	lastUsedTime         time.Time // the last time this connection was established
+	expiresAfter         time.Time // the time until when this connection can stay idle
 
 	// pool related fields
 	pool         *pool
@@ -51,7 +51,6 @@ func newConnection(addr Address, opts ...ConnectionOption) (*connection, error) 
 		connectDone:        make(chan struct{}),
 		config:             cfg,
 		connectContextMade: make(chan struct{}),
-		lastUsedTime:       time.Now(),
 	}
 	atomic.StoreInt32(&c.connected, initialized)
 
