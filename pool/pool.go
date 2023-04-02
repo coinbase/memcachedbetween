@@ -39,12 +39,12 @@ func (pe Error) Error() string { return string(pe) }
 
 // poolConfig contains all aspects of the pool that can be configured
 type poolConfig struct {
-	Address              Address
-	MinPoolSize          uint64
-	MaxPoolSize          uint64 // MaxPoolSize is not used because handling the max number of connections in the pool is handled in server. This is only used for command monitoring
-	PoolMonitor          *Monitor
+	Address            Address
+	MinPoolSize        uint64
+	MaxPoolSize        uint64 // MaxPoolSize is not used because handling the max number of connections in the pool is handled in server. This is only used for command monitoring
+	PoolMonitor        *Monitor
 	ConnectionLifeSpan time.Duration // if set, determines how long to keep a connection if left unused
-	MaintainInterval     time.Duration // for ResourcePool periodic element checks
+	MaintainInterval   time.Duration // for ResourcePool periodic element checks
 }
 
 // pool is a wrapper of resource pool that follows the CMAP spec for connection pools
@@ -55,10 +55,10 @@ type pool struct {
 	generation uint64        // must be accessed using atomic package
 	monitor    *Monitor
 
-	connected  int32 // Must be accessed using the sync/atomic package.
-	nextid     uint64
-	opened     map[uint64]*connection // opened holds all of the currently open connections.
-	sem        *semaphore.Weighted
+	connected          int32 // Must be accessed using the sync/atomic package.
+	nextid             uint64
+	opened             map[uint64]*connection // opened holds all of the currently open connections.
+	sem                *semaphore.Weighted
 	connectionLifeSpan time.Duration // max allowed connection idleness
 	sync.Mutex
 }
@@ -135,18 +135,18 @@ func newPool(config poolConfig, connOpts ...ConnectionOption) (*pool, error) {
 	}
 
 	pool := &pool{
-		address:    config.Address,
-		monitor:    config.PoolMonitor,
-		connected:  disconnected,
-		opened:     make(map[uint64]*connection),
-		opts:       opts,
-		sem:        semaphore.NewWeighted(int64(maxConns)),
+		address:   config.Address,
+		monitor:   config.PoolMonitor,
+		connected: disconnected,
+		opened:    make(map[uint64]*connection),
+		opts:      opts,
+		sem:       semaphore.NewWeighted(int64(maxConns)),
 	}
 	if config.ConnectionLifeSpan == 0 {
-    pool.connectionLifeSpan = math.MaxInt64 * time.Nanosecond
-  } else {
-    pool.connectionLifeSpan = config.ConnectionLifeSpan
-  }
+		pool.connectionLifeSpan = math.MaxInt64 * time.Nanosecond
+	} else {
+		pool.connectionLifeSpan = config.ConnectionLifeSpan
+	}
 	maintainInterval := config.MaintainInterval
 	if maintainInterval == 0 {
 		maintainInterval = defaultMaintainInterval
@@ -278,7 +278,7 @@ func (p *pool) makeNewConnection() (*connection, string, error) {
 	c.pool = p
 	c.poolID = atomic.AddUint64(&p.nextid, 1)
 	c.generation = atomic.LoadUint64(&p.generation)
-  c.expiresAfter = time.Now().Add(p.connectionLifeSpan)
+	c.expiresAfter = time.Now().Add(p.connectionLifeSpan)
 
 	if p.monitor != nil {
 		p.monitor.Event(&Event{

@@ -8,39 +8,41 @@ import (
 )
 
 func newRp(expiredElements ...int) (*resourcePool, error) {
-  expired := FakeExpiredElements {
-    Expired: make(map[int]bool),
-  }
-  for i := range expiredElements {
-    expired.Expired[i] = true
-  }
-  var config = resourcePoolConfig{
-    MaxSize:          5,
-    MinSize:          0,
-    MaintainInterval: 300 * time.Second,
-    ExpiredFn:        expired.rpExpiredFunc,
-    CloseFn:          rpCloseFunc,
-    InitFn:           rpInitFunc,
-  }
-  rp, e := newResourcePool(config)
+	expired := FakeExpiredElements{
+		Expired: make(map[int]bool),
+	}
+	for i := range expiredElements {
+		expired.Expired[i] = true
+	}
+	var config = resourcePoolConfig{
+		MaxSize:          5,
+		MinSize:          0,
+		MaintainInterval: 300 * time.Second,
+		ExpiredFn:        expired.rpExpiredFunc,
+		CloseFn:          rpCloseFunc,
+		InitFn:           rpInitFunc,
+	}
+	rp, e := newResourcePool(config)
 	return rp, e
 }
 
 var counter = 0
+
 func rpInitFunc() interface{} {
 	counter++
 	return counter
 }
+
 type FakeExpiredElements struct {
-  Expired     map[int]bool
+	Expired map[int]bool
 }
 
 func (fe *FakeExpiredElements) rpExpiredFunc(item interface{}) bool {
-  i := item.(int)
-  if fe.Expired[i] {
-    return true
-  }
-  return false
+	i := item.(int)
+	if fe.Expired[i] {
+		return true
+	}
+	return false
 }
 func rpCloseFunc(interface{}) {
 
@@ -53,7 +55,7 @@ func TestList(t *testing.T) {
 	assert.Nil(t, rp.start)
 	assert.Nil(t, rp.end)
 
-  // Put uses add which increments size
+	// Put uses add which increments size
 	newItem := 1
 	assert.True(t, rp.Put(newItem))
 	assert.Equal(t, uint64(1), rp.size)
@@ -64,7 +66,7 @@ func TestList(t *testing.T) {
 	assert.Nil(t, rp.end.next)
 	assert.Nil(t, rp.end.prev)
 
-  // this should reduce the size to 0
+	// this should reduce the size to 0
 	entry := rp.Get()
 	assert.NotNil(t, entry)
 	assert.Equal(t, uint64(0), rp.size)
@@ -72,7 +74,7 @@ func TestList(t *testing.T) {
 	assert.Nil(t, rp.start)
 	assert.Nil(t, rp.end)
 
-  // it's able to recover from going all the way to zero
+	// it's able to recover from going all the way to zero
 	assert.True(t, rp.Put(newItem))
 	assert.Equal(t, uint64(1), rp.size)
 	assert.Equal(t, newItem, entry)
@@ -108,4 +110,26 @@ func TestTakenFromStart(t *testing.T) {
 	item2 := rp.Get().(int)
 	assert.Equal(t, 1, item1)
 	assert.Equal(t, 2, item2)
+}
+
+// Go through arbitrary sizes of the pool and make sure items are added and removed in proper order
+func TestAddTakeRightOrder(t *testing.T) {
+	for i := 1; i < 10; i++ {
+		rp, e := newRp()
+		assert.NoError(t, e)
+		for j := 0; j < i; j++ {
+			assert.True(t, rp.Put(j))
+		}
+		assert.Equal(t, i, int(rp.size))
+		// validate that the elements are layed out in the first in first
+		ptr := rp.start
+		for j := 0; j < i; j++ {
+			assert.Equal(t, j, ptr.value.(int))
+			ptr = ptr.next
+		}
+		// they are in the order 1..n when you take them out
+		for j := 0; j < i; j++ {
+			assert.Equal(t, j, rp.Get().(int))
+		}
+	}
 }
