@@ -11,6 +11,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 var globalConnectionID uint64 = 1
@@ -28,6 +29,7 @@ type connection struct {
 	cancelConnectContext context.CancelFunc
 	connectContextMade   chan struct{}
 	connectContextMutex  sync.Mutex
+	expiresAfter         time.Time // the time until when this connection can stay idle
 
 	// pool related fields
 	pool         *pool

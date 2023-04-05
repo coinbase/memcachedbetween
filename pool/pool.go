@@ -33,16 +33,18 @@ var ErrWaitQueueTimeout = Error("timed out while checking out a connection from 
 type Error string
 
 // maintainInterval is the interval at which the background routine to close stale connections will be run.
-var maintainInterval = time.Minute
+var defaultMaintainInterval = time.Minute
 
 func (pe Error) Error() string { return string(pe) }
 
 // poolConfig contains all aspects of the pool that can be configured
 type poolConfig struct {
-	Address     Address
-	MinPoolSize uint64
-	MaxPoolSize uint64 // MaxPoolSize is not used because handling the max number of connections in the pool is handled in server. This is only used for command monitoring
-	PoolMonitor *Monitor
+	Address            Address
+	MinPoolSize        uint64
+	MaxPoolSize        uint64 // MaxPoolSize is not used because handling the max number of connections in the pool is handled in server. This is only used for command monitoring
+	PoolMonitor        *Monitor
+	ConnectionLifeSpan time.Duration // if set, determines how long to keep a connection if left unused
+	MaintainInterval   time.Duration // for ResourcePool periodic element checks
 }
 
 // pool is a wrapper of resource pool that follows the CMAP spec for connection pools
@@ -53,10 +55,11 @@ type pool struct {
 	generation uint64        // must be accessed using atomic package
 	monitor    *Monitor
 
-	connected int32 // Must be accessed using the sync/atomic package.
-	nextid    uint64
-	opened    map[uint64]*connection // opened holds all of the currently open connections.
-	sem       *semaphore.Weighted
+	connected          int32 // Must be accessed using the sync/atomic package.
+	nextid             uint64
+	opened             map[uint64]*connection // opened holds all of the currently open connections.
+	sem                *semaphore.Weighted
+	connectionLifeSpan time.Duration // max allowed connection idleness
 	sync.Mutex
 }
 
@@ -79,6 +82,8 @@ func connectionExpiredFunc(v interface{}) bool {
 		c.expireReason = ReasonConnectionErrored
 	case c.pool.stale(c):
 		c.expireReason = ReasonStale
+	case c.pool.connectionExpired(c):
+		c.expireReason = ReasonConnectionExpired
 	default:
 		return false
 	}
@@ -137,6 +142,15 @@ func newPool(config poolConfig, connOpts ...ConnectionOption) (*pool, error) {
 		opts:      opts,
 		sem:       semaphore.NewWeighted(int64(maxConns)),
 	}
+	if config.ConnectionLifeSpan == 0 {
+		pool.connectionLifeSpan = math.MaxInt64 * time.Nanosecond
+	} else {
+		pool.connectionLifeSpan = config.ConnectionLifeSpan
+	}
+	maintainInterval := config.MaintainInterval
+	if maintainInterval == 0 {
+		maintainInterval = defaultMaintainInterval
+	}
 
 	// we do not pass in config.MaxPoolSize because we manage the max size at this level rather than the resource pool level
 	rpc := resourcePoolConfig{
@@ -171,6 +185,11 @@ func newPool(config poolConfig, connOpts ...ConnectionOption) (*pool, error) {
 // stale checks if a given connection's generation is below the generation of the pool
 func (p *pool) stale(c *connection) bool {
 	return c == nil || c.generation < atomic.LoadUint64(&p.generation)
+}
+
+// checks if a given connection's expiresAfter has exceeded
+func (p *pool) connectionExpired(c *connection) bool {
+	return c == nil || time.Now().After(c.expiresAfter)
 }
 
 // connect puts the pool into the connected state, allowing it to be used and will allow items to begin being processed from the wait queue
@@ -259,6 +278,7 @@ func (p *pool) makeNewConnection() (*connection, string, error) {
 	c.pool = p
 	c.poolID = atomic.AddUint64(&p.nextid, 1)
 	c.generation = atomic.LoadUint64(&p.generation)
+	c.expiresAfter = time.Now().Add(p.connectionLifeSpan)
 
 	if p.monitor != nil {
 		p.monitor.Event(&Event{
@@ -513,6 +533,7 @@ func (p *pool) put(c *connection) error {
 		return ErrWrongPool
 	}
 
+	c.expiresAfter = time.Now().Add(p.connectionLifeSpan) // we really don't know if the connection was used; but this is a good guess
 	_ = p.conns.Put(c)
 
 	return nil
