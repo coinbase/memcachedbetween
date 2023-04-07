@@ -12,7 +12,8 @@ import (
 )
 
 // ClusterNodes Reads from the elasticache config node (endpoint) and
-//              returns a slice of memcache node addresses
+//
+//	returns a slice of memcache node addresses
 func ClusterNodes(l *zap.Logger, endpoint string) ([]string, error) {
 	if !strings.Contains(endpoint, ":") {
 		endpoint = endpoint + ":11211"

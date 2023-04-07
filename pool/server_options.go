@@ -6,11 +6,16 @@
 
 package pool
 
+import (
+	"time"
+)
+
 type serverConfig struct {
 	connectionOpts []ConnectionOption
 	maxConns       uint64
 	minConns       uint64
 	poolMonitor    *Monitor
+	idleTimeout    time.Duration
 }
 
 func newServerConfig(opts ...ServerOption) (*serverConfig, error) {
@@ -62,6 +67,14 @@ func WithMinConnections(fn func(uint64) uint64) ServerOption {
 func WithConnectionPoolMonitor(fn func(*Monitor) *Monitor) ServerOption {
 	return func(cfg *serverConfig) error {
 		cfg.poolMonitor = fn(cfg.poolMonitor)
+		return nil
+	}
+}
+
+// WithConnectionPoolMonitor configures the monitor for all connection pool actions
+func WithIdleTimeout(fn func(time.Duration) time.Duration) ServerOption {
+	return func(cfg *serverConfig) error {
+		cfg.idleTimeout = fn(cfg.idleTimeout)
 		return nil
 	}
 }
