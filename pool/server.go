@@ -84,6 +84,12 @@ func NewServer(addr Address, opts ...ServerOption) (*Server, error) {
 		MaxPoolSize: cfg.maxConns,
 		PoolMonitor: cfg.poolMonitor,
 	}
+	if cfg.idleTimeout > 0 {
+		pc.IdleTimeout = cfg.idleTimeout
+		if cfg.idleTimeout < defaultMaintainInterval {
+			pc.MaintainInterval = cfg.idleTimeout
+		}
+	}
 
 	s.pool, err = newPool(pc, cfg.connectionOpts...)
 	if err != nil {

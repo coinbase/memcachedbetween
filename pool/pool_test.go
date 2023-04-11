@@ -68,12 +68,12 @@ func TestConnectionExpiry(t *testing.T) {
 	var address Address = "localhost:38888"
 	go startTcpServer(string(address))
 	config := poolConfig{
-		Address:            address,
-		MinPoolSize:        1,
-		MaxPoolSize:        1,
-		PoolMonitor:        nil,
-		ConnectionLifeSpan: duration,
-		MaintainInterval:   1 * time.Second,
+		Address:          address,
+		MinPoolSize:      1,
+		MaxPoolSize:      1,
+		PoolMonitor:      nil,
+		IdleTimeout:      duration,
+		MaintainInterval: 1 * time.Second,
 	}
 
 	p, e := newPool(config)
@@ -100,12 +100,12 @@ func TestGoodConnectionDespiteInactivity(t *testing.T) {
 	var address Address = "localhost:38889"
 	go startTcpServer(string(address))
 	config := poolConfig{
-		Address:            address,
-		MinPoolSize:        1,
-		MaxPoolSize:        1,
-		PoolMonitor:        nil,
-		ConnectionLifeSpan: duration,
-		MaintainInterval:   1 * time.Second,
+		Address:          address,
+		MinPoolSize:      1,
+		MaxPoolSize:      1,
+		PoolMonitor:      nil,
+		IdleTimeout:      duration,
+		MaintainInterval: 1 * time.Second,
 	}
 
 	p, e := newPool(config)
@@ -129,8 +129,8 @@ func TestGoodConnectionDespiteInactivity(t *testing.T) {
 	}
 }
 
-// make sure connections never expire if lifespan is not set
-func TestNoExpiryWhenNoLifeSpan(t *testing.T) {
+// make sure connections never expire if IdleTimeout is not set
+func TestNoExpiryWhenNoIdleTimeout(t *testing.T) {
 	var address Address = "localhost:38899"
 	go startTcpServer(string(address))
 	config := poolConfig{
@@ -146,7 +146,7 @@ func TestNoExpiryWhenNoLifeSpan(t *testing.T) {
 	assert.NoError(t, e)
 	e = p.connect()
 	assert.NoError(t, e)
-	assert.Equal(t, math.MaxInt64*time.Nanosecond, p.connectionLifeSpan)
+	assert.Equal(t, math.MaxInt64*time.Nanosecond, p.idleTimeout)
 
 	// get a reference to a connection
 	ctx := context.TODO()
